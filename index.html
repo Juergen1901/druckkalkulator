@@ -1,0 +1,641 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b8a68">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Druckkalk.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<style>
+:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html,body{height:auto}
+[hidden]{display:none!important}
+</style>
+<title>Druckkalkulator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: Telefon = eine Spalte mit fester Tab-Leiste unten; iPad/breit = Eingaben links, Ergebnis rechts (sticky). */
+:root {
+  --bg: #f1f4f3;
+  --surface: #ffffff;
+  --ink: #15201c;
+  --muted: #5c6b65;
+  --line: #d7dfdc;
+  --accent: #0b8a68;
+  --accent-ink: #ffffff;
+  --accent-soft: #dff1ea;
+  --warn: #b4531a;
+  --field: #f6f8f7;
+  --font-body: "IBM Plex Sans", -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --font-num: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1412;
+    --surface: #161f1b;
+    --ink: #e6efeb;
+    --muted: #8fa19a;
+    --line: #27332e;
+    --accent: #3fd4a2;
+    --accent-ink: #06231a;
+    --accent-soft: #15332a;
+    --warn: #f0985a;
+    --field: #1b2621;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1412;
+  --surface: #161f1b;
+  --ink: #e6efeb;
+  --muted: #8fa19a;
+  --line: #27332e;
+  --accent: #3fd4a2;
+  --accent-ink: #06231a;
+  --accent-soft: #15332a;
+  --warn: #f0985a;
+  --field: #1b2621;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--bg); }
+body {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.45;
+  padding-inline: 16px;
+  padding-block: 0 96px;
+  -webkit-text-size-adjust: 100%;
+}
+.wrap { max-width: 980px; margin-inline: auto; }
+header.top {
+  position: sticky;
+  top: env(safe-area-inset-top, 0px);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-block: 12px;
+  margin-inline: -16px;
+  padding-inline: 16px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+}
+h1 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+.sub { display: block; color: var(--muted); font-size: 12px; font-weight: 400; }
+.pricebar { text-align: right; min-width: 0; }
+.pricebar .k { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.pricebar .v { font-family: var(--font-num); font-weight: 600; font-size: 20px; font-variant-numeric: tabular-nums; color: var(--accent); }
+main { padding-block: 16px; }
+.tab[hidden] { display: none !important; }
+.grid { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 760px) {
+  .grid { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: start; }
+  .sticky { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 76px); }
+}
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+.card + .card { margin-top: 16px; }
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+h2 { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); }
+.fields { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.fields .full { grid-column: 1 / -1; }
+label.f { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+label.f > span.l { font-size: 12.5px; color: var(--muted); }
+.in { position: relative; }
+.in input {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 40px 10px 12px;
+  font: inherit;
+  font-size: 16px;
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.in input.text { font-family: var(--font-body); padding-right: 12px; }
+.in input::placeholder { color: var(--muted); opacity: 0.7; }
+.in input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.in .u { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: 13px; color: var(--muted); pointer-events: none; }
+.hint { font-size: 12px; color: var(--muted); margin: 0; }
+.example { margin: 0 0 12px; padding: 8px 10px; border-radius: 8px; background: var(--accent-soft); color: var(--ink); font-size: 13px; }
+button { font: inherit; cursor: pointer; }
+.btn {
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 500;
+}
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.danger { color: var(--warn); }
+.btn.small { min-height: 36px; padding: 0 12px; font-size: 13.5px; }
+.btn.armed { background: var(--warn); color: #fff; border-color: var(--warn); }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+.actions .btn.primary { flex: 1 1 160px; }
+
+.hero { padding: 18px 16px 16px; }
+.hero .k { font-size: 12px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); }
+.hero .big { font-family: var(--font-num); font-weight: 600; font-size: 40px; line-height: 1.1; letter-spacing: -0.02em; color: var(--accent); font-variant-numeric: tabular-nums; margin: 4px 0 2px; overflow-wrap: anywhere; }
+.hero .per { color: var(--muted); font-size: 13px; }
+.kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.kpi .k { font-size: 11.5px; color: var(--muted); }
+.kpi .v { font-family: var(--font-num); font-weight: 600; font-size: 15px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.kpi .v.gain { color: var(--accent); }
+.kpi .v.loss { color: var(--warn); }
+ul.break { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+ul.break li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: baseline; }
+ul.break .n { font-size: 14px; }
+ul.break .a { font-family: var(--font-num); font-variant-numeric: tabular-nums; font-size: 14px; }
+ul.break .bar { grid-column: 1 / -1; height: 5px; border-radius: 3px; background: var(--field); overflow: hidden; }
+ul.break .bar i { display: block; height: 100%; background: var(--accent); border-radius: 3px; min-width: 0; }
+.total { display: flex; justify-content: space-between; gap: 12px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); font-weight: 600; }
+.total .a { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+.derived { margin-top: 14px; padding: 10px 12px; border-radius: 10px; background: var(--field); font-size: 13px; color: var(--muted); display: grid; gap: 4px; }
+.derived b { font-family: var(--font-num); font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+.saved { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.saved li { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: grid; gap: 10px; }
+.saved .t { font-weight: 600; overflow-wrap: anywhere; }
+.saved .m { display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: 13px; color: var(--muted); }
+.saved .m b { font-family: var(--font-num); font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+.saved .row { display: flex; gap: 8px; }
+.empty { padding: 28px 16px; text-align: center; color: var(--muted); background: var(--surface); border: 1px dashed var(--line); border-radius: 14px; }
+
+nav.tabbar {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+nav.tabbar button {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 9px 4px 8px;
+  background: none; border: 0;
+  color: var(--muted);
+  font-size: 11.5px; font-weight: 500;
+}
+nav.tabbar button svg { width: 24px; height: 24px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+nav.tabbar button[aria-selected="true"] { color: var(--accent); }
+@media (max-width: 380px) {
+  .fields { grid-template-columns: minmax(0, 1fr); }
+  .hero .big { font-size: 34px; }
+  .kpis { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  ul.break .bar i { transition: width 0.25s ease; }
+}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Druckkalkulator</h1>
+      <span class="sub">Selbstkosten und Verkaufspreis</span>
+    </div>
+    <div class="pricebar" aria-live="polite">
+      <div class="k">Verkauf brutto</div>
+      <div class="v" id="barPrice">–</div>
+    </div>
+  </header>
+
+  <main>
+    <section id="tab-calc" class="tab" role="tabpanel">
+      <div class="grid">
+        <form class="card" id="calcForm" autocomplete="off" onsubmit="return false">
+          <div class="card-head">
+            <h2>Artikel</h2>
+            <button type="button" class="btn small" id="btnClear">Leeren</button>
+          </div>
+          <p class="example" id="exampleNote">Die Werte sind ein Beispiel. Einfach überschreiben.</p>
+          <div class="fields" id="calcFields"></div>
+          <div class="actions">
+            <button type="button" class="btn primary" id="btnSave">Artikel speichern</button>
+          </div>
+          <p class="hint" id="saveMsg" style="margin-top:10px" role="status"></p>
+        </form>
+
+        <div class="sticky">
+          <div class="card hero">
+            <div class="k">Verkaufspreis brutto je Stück</div>
+            <div class="big" id="rBrutto">–</div>
+            <div class="per" id="rPer">–</div>
+            <div class="kpis">
+              <div class="kpi"><div class="k">Selbstkosten</div><div class="v" id="rSelbst">–</div></div>
+              <div class="kpi"><div class="k">Netto</div><div class="v" id="rNetto">–</div></div>
+              <div class="kpi"><div class="k">Gewinn</div><div class="v gain" id="rGewinn">–</div></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h2>Kosten je Stück</h2></div>
+            <ul class="break" id="breakdown"></ul>
+            <div class="total"><span>Selbstkosten</span><span class="a" id="rSelbst2">–</span></div>
+            <div class="derived" id="derived"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-saved" class="tab" role="tabpanel" hidden>
+      <div class="card-head"><h2>Gespeicherte Artikel</h2></div>
+      <ul class="saved" id="savedList"></ul>
+    </section>
+
+    <section id="tab-set" class="tab" role="tabpanel" hidden>
+      <div class="card">
+        <div class="card-head"><h2>Drucker und Strom</h2></div>
+        <div class="fields" id="setPrinter"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>Arbeit und Zuschläge</h2></div>
+        <div class="fields" id="setWork"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>Preis</h2></div>
+        <div class="fields" id="setPrice"></div>
+      </div>
+      <div class="card">
+        <p class="hint">Alle Werte sind Annahmen und Platzhalter. Bitte mit deinen echten Zahlen ersetzen. Die Daten bleiben nur in diesem Browser auf diesem Gerät gespeichert. iPhone und iPad haben getrennte Daten.</p>
+        <div class="actions"><button type="button" class="btn danger" id="btnReset">Einstellungen zurücksetzen</button></div>
+      </div>
+    </section>
+  </main>
+
+  <nav class="tabbar" role="tablist" aria-label="Bereiche">
+    <button role="tab" aria-selected="true" data-tab="calc">
+      <svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 12h2M14 12h2M8 16h2M14 16h2"/></svg>Rechner
+    </button>
+    <button role="tab" aria-selected="false" data-tab="saved">
+      <svg viewBox="0 0 24 24"><path d="M6 4h12v17l-6-4-6 4z"/></svg>Artikel
+    </button>
+    <button role="tab" aria-selected="false" data-tab="set">
+      <svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>Einstellungen
+    </button>
+  </nav>
+</div>
+
+<script>
+(function () {
+  var KEY = 'druckkalkulator.v1';
+
+  var DEF_SET = {
+    strom: 0.35, watt: 350, anschaffung: 2000, lebensdauer: 5000, verschleiss: 0.15,
+    stundenlohn: 20, ruest: 10, fehl: 5, gemein: 5, gebuehr: 0, marge: 50, mwst: 19
+  };
+  var DEF_CALC = {
+    name: 'Beispiel: Handyhalter', rolle: '19,99', modell: '45', support: '8',
+    zeitH: '2', zeitM: '30', nach: '5', stueck: '1', verp: '0,30', sonst: '0', marge: ''
+  };
+  var EMPTY_CALC = {
+    name: '', rolle: '', modell: '', support: '', zeitH: '', zeitM: '', nach: '', stueck: '1',
+    verp: '', sonst: '', marge: ''
+  };
+
+  var CALC_FIELDS = [
+    { k: 'name', l: 'Name des Artikels', text: true, full: true, ph: 'z. B. Gerätegehäuse' },
+    { k: 'rolle', l: 'Rollenpreis 1 kg', u: '€', full: true },
+    { k: 'modell', l: 'Modellgewicht je Druck', u: 'g' },
+    { k: 'support', l: 'Support / Purge je Druck', u: 'g' },
+    { k: 'zeitH', l: 'Druckzeit Stunden', u: 'h' },
+    { k: 'zeitM', l: 'Druckzeit Minuten', u: 'min' },
+    { k: 'stueck', l: 'Stück je Druck', u: 'Stk' },
+    { k: 'nach', l: 'Nachbearbeitung je Stück', u: 'min' },
+    { k: 'verp', l: 'Verpackung je Stück', u: '€' },
+    { k: 'sonst', l: 'Sonstiges je Stück', u: '€' },
+    { k: 'marge', l: 'Marge (leer = Standard)', u: '%', full: true }
+  ];
+  var SET_PRINTER = [
+    { k: 'strom', l: 'Strompreis', u: '€/kWh' },
+    { k: 'watt', l: 'Ø Leistung Drucker', u: 'W' },
+    { k: 'anschaffung', l: 'Anschaffung Drucker + Zubehör', u: '€' },
+    { k: 'lebensdauer', l: 'Lebensdauer', u: 'h' },
+    { k: 'verschleiss', l: 'Verschleiß je Druckstunde', u: '€/h', full: true }
+  ];
+  var SET_WORK = [
+    { k: 'stundenlohn', l: 'Stundenlohn', u: '€/h' },
+    { k: 'ruest', l: 'Rüstzeit je Druck', u: 'min' },
+    { k: 'fehl', l: 'Fehldruck-Zuschlag', u: '%' },
+    { k: 'gemein', l: 'Gemeinkosten-Zuschlag', u: '%' }
+  ];
+  var SET_PRICE = [
+    { k: 'marge', l: 'Standard-Marge (Aufschlag)', u: '%' },
+    { k: 'gebuehr', l: 'Verkaufsgebühren', u: '%' },
+    { k: 'mwst', l: 'MwSt. (0 bei Kleinunternehmer)', u: '%', full: true }
+  ];
+
+  function num(v) {
+    if (v === null || v === undefined || v === '') return 0;
+    if (typeof v === 'number') return isFinite(v) ? v : 0;
+    var n = parseFloat(String(v).replace(',', '.'));
+    return isFinite(n) ? n : 0;
+  }
+
+  /* Gleiche Rechenlogik wie in der Excel-Tabelle */
+  function compute(c, s) {
+    var g = Math.max(1, num(c.stueck));
+    var zeit = num(c.zeitH) + num(c.zeitM) / 60;
+    var stromH = num(s.watt) / 1000 * num(s.strom);
+    var abschrH = num(s.lebensdauer) ? num(s.anschaffung) / num(s.lebensdauer) : 0;
+    var maschH = abschrH + num(s.verschleiss);
+    var material = (num(c.modell) + num(c.support)) * num(c.rolle) / 1000 / g;
+    var strom = zeit * stromH / g;
+    var masch = zeit * maschH / g;
+    var arbeit = (num(c.nach) + num(s.ruest) / g) / 60 * num(s.stundenlohn);
+    var base = material + strom + masch;
+    var fehl = base * num(s.fehl) / 100;
+    var verp = num(c.verp);
+    var sonst = num(c.sonst);
+    var gemein = (base + arbeit + fehl + verp + sonst) * num(s.gemein) / 100;
+    var selbst = base + arbeit + fehl + gemein + verp + sonst;
+    var margeEff = String(c.marge).trim() === '' ? num(s.marge) / 100 : num(c.marge) / 100;
+    var geb = Math.min(Math.max(num(s.gebuehr), 0), 95) / 100;
+    var netto = selbst * (1 + margeEff) / (1 - geb);
+    var mwst = netto * num(s.mwst) / 100;
+    var brutto = netto + mwst;
+    var gewinn = netto * (1 - geb) - selbst;
+    return {
+      material: material, strom: strom, masch: masch, arbeit: arbeit, fehl: fehl, gemein: gemein,
+      verp: verp, sonst: sonst, selbst: selbst, marge: margeEff, netto: netto, mwst: mwst,
+      brutto: brutto, gewinn: gewinn, stromH: stromH, abschrH: abschrH, maschH: maschH, geb: geb
+    };
+  }
+  window.__compute = compute;
+
+  var eur = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
+  var pct = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 1 });
+  function fmt(n) { return eur.format(isFinite(n) ? n : 0); }
+
+  /* Speicher */
+  var state = load();
+  function load() {
+    try {
+      var raw = localStorage.getItem(KEY);
+      if (raw) {
+        var o = JSON.parse(raw);
+        return {
+          settings: Object.assign({}, DEF_SET, o.settings || {}),
+          calc: Object.assign({}, DEF_CALC, o.calc || {}),
+          items: Array.isArray(o.items) ? o.items : [],
+          example: !!o.example
+        };
+      }
+    } catch (e) {}
+    return { settings: Object.assign({}, DEF_SET), calc: Object.assign({}, DEF_CALC), items: [], example: true };
+  }
+  function persist() {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+  }
+
+  var $ = function (s) { return document.querySelector(s); };
+
+  /* Felder bauen */
+  function buildFields(host, list, store, onChange) {
+    list.forEach(function (f) {
+      var lab = document.createElement('label');
+      lab.className = 'f' + (f.full ? ' full' : '');
+      var sp = document.createElement('span');
+      sp.className = 'l';
+      sp.textContent = f.l;
+      var wrap = document.createElement('span');
+      wrap.className = 'in';
+      var inp = document.createElement('input');
+      inp.id = (store === 'calc' ? 'c_' : 's_') + f.k;
+      inp.dataset.k = f.k;
+      if (f.text) {
+        inp.type = 'text';
+        inp.className = 'text';
+        inp.autocomplete = 'off';
+      } else {
+        inp.type = 'text';
+        inp.inputMode = 'decimal';
+        inp.autocomplete = 'off';
+      }
+      if (f.ph) inp.placeholder = f.ph;
+      wrap.appendChild(inp);
+      if (f.u) {
+        var u = document.createElement('span');
+        u.className = 'u';
+        u.textContent = f.u;
+        wrap.appendChild(u);
+      }
+      lab.appendChild(sp);
+      lab.appendChild(wrap);
+      host.appendChild(lab);
+      inp.addEventListener('input', function () {
+        onChange(f.k, inp.value);
+      });
+    });
+  }
+
+  function fillInputs() {
+    CALC_FIELDS.forEach(function (f) {
+      $('#c_' + f.k).value = state.calc[f.k] === undefined ? '' : state.calc[f.k];
+    });
+    SET_PRINTER.concat(SET_WORK, SET_PRICE).forEach(function (f) {
+      var v = state.settings[f.k];
+      $('#s_' + f.k).value = String(v).replace('.', ',');
+    });
+    updatePlaceholder();
+  }
+  function updatePlaceholder() {
+    $('#c_marge').placeholder = 'Standard ' + pct.format(num(state.settings.marge));
+  }
+
+  buildFields($('#calcFields'), CALC_FIELDS, 'calc', function (k, v) {
+    state.calc[k] = v;
+    if (state.example) { state.example = false; $('#exampleNote').hidden = true; }
+    persist();
+    render();
+  });
+  buildFields($('#setPrinter'), SET_PRINTER, 'set', setChange);
+  buildFields($('#setWork'), SET_WORK, 'set', setChange);
+  buildFields($('#setPrice'), SET_PRICE, 'set', setChange);
+  function setChange(k, v) {
+    state.settings[k] = v;
+    persist();
+    updatePlaceholder();
+    render();
+  }
+
+  /* Anzeige */
+  function render() {
+    var c = state.calc, s = state.settings;
+    var r = compute(c, s);
+    $('#exampleNote').hidden = !state.example;
+    $('#barPrice').textContent = fmt(r.brutto);
+    $('#rBrutto').textContent = fmt(r.brutto);
+    $('#rSelbst').textContent = fmt(r.selbst);
+    $('#rSelbst2').textContent = fmt(r.selbst);
+    $('#rNetto').textContent = fmt(r.netto);
+    var gw = $('#rGewinn');
+    gw.textContent = fmt(r.gewinn);
+    gw.className = 'v ' + (r.gewinn < 0 ? 'loss' : 'gain');
+    $('#rPer').textContent = 'Netto ' + fmt(r.netto) + ' + ' + pct.format(num(s.mwst)) + ' % MwSt. · Marge ' + pct.format(r.marge * 100) + ' %';
+
+    var rows = [
+      ['Material', r.material], ['Strom', r.strom], ['Maschine und Verschleiß', r.masch],
+      ['Arbeit', r.arbeit], ['Fehldruck-Zuschlag', r.fehl], ['Gemeinkosten', r.gemein],
+      ['Verpackung', r.verp], ['Sonstiges', r.sonst]
+    ];
+    var ul = $('#breakdown');
+    ul.innerHTML = '';
+    rows.forEach(function (row) {
+      var li = document.createElement('li');
+      var n = document.createElement('span'); n.className = 'n'; n.textContent = row[0];
+      var a = document.createElement('span'); a.className = 'a'; a.textContent = fmt(row[1]);
+      var bar = document.createElement('span'); bar.className = 'bar';
+      var i = document.createElement('i');
+      i.style.width = (r.selbst > 0 ? Math.max(0, Math.min(100, row[1] / r.selbst * 100)) : 0) + '%';
+      bar.appendChild(i);
+      li.appendChild(n); li.appendChild(a); li.appendChild(bar);
+      ul.appendChild(li);
+    });
+
+    var d = $('#derived');
+    d.innerHTML = '';
+    [
+      ['Stromkosten je Druckstunde', fmt(r.stromH)],
+      ['Maschine je Druckstunde (Abschreibung + Verschleiß)', fmt(r.maschH)],
+      ['Verkaufsgebühren', pct.format(r.geb * 100) + ' %']
+    ].forEach(function (x) {
+      var div = document.createElement('div');
+      div.appendChild(document.createTextNode(x[0] + ': '));
+      var b = document.createElement('b'); b.textContent = x[1];
+      div.appendChild(b);
+      d.appendChild(div);
+    });
+    renderSaved();
+  }
+
+  function renderSaved() {
+    var ul = $('#savedList');
+    ul.innerHTML = '';
+    if (!state.items.length) {
+      var li = document.createElement('li');
+      li.className = 'empty';
+      li.textContent = 'Noch nichts gespeichert. Im Rechner einen Artikel benennen und auf „Artikel speichern“ tippen.';
+      li.style.display = 'block';
+      ul.appendChild(li);
+      return;
+    }
+    state.items.forEach(function (it) {
+      var r = compute(it.calc, state.settings);
+      var li = document.createElement('li');
+      var t = document.createElement('div'); t.className = 't'; t.textContent = it.calc.name || 'Ohne Namen';
+      var m = document.createElement('div'); m.className = 'm';
+      [['Selbstkosten', fmt(r.selbst)], ['Netto', fmt(r.netto)], ['Brutto', fmt(r.brutto)], ['Gewinn', fmt(r.gewinn)]].forEach(function (x) {
+        var s = document.createElement('span');
+        s.appendChild(document.createTextNode(x[0] + ' '));
+        var b = document.createElement('b'); b.textContent = x[1];
+        s.appendChild(b);
+        m.appendChild(s);
+      });
+      var row = document.createElement('div'); row.className = 'row';
+      var open = document.createElement('button'); open.type = 'button'; open.className = 'btn small primary'; open.textContent = 'Öffnen';
+      open.addEventListener('click', function () {
+        state.calc = Object.assign({}, EMPTY_CALC, it.calc);
+        state.example = false;
+        persist(); fillInputs(); render(); showTab('calc');
+      });
+      var del = document.createElement('button'); del.type = 'button'; del.className = 'btn small danger'; del.textContent = 'Löschen';
+      armed(del, 'Wirklich löschen?', function () {
+        state.items = state.items.filter(function (x) { return x.id !== it.id; });
+        persist(); renderSaved();
+      });
+      row.appendChild(open); row.appendChild(del);
+      li.appendChild(t); li.appendChild(m); li.appendChild(row);
+      ul.appendChild(li);
+    });
+  }
+
+  /* Zweistufiges Bestätigen (kein confirm() im Viewer) */
+  function armed(btn, armedLabel, action) {
+    var orig = btn.textContent, timer = null;
+    btn.addEventListener('click', function () {
+      if (btn.classList.contains('armed')) {
+        clearTimeout(timer);
+        btn.classList.remove('armed');
+        btn.textContent = orig;
+        action();
+      } else {
+        btn.classList.add('armed');
+        btn.textContent = armedLabel;
+        timer = setTimeout(function () {
+          btn.classList.remove('armed');
+          btn.textContent = orig;
+        }, 3000);
+      }
+    });
+  }
+
+  /* Aktionen */
+  $('#btnClear').addEventListener('click', function () {
+    state.calc = Object.assign({}, EMPTY_CALC);
+    state.example = false;
+    persist(); fillInputs(); render();
+    $('#saveMsg').textContent = '';
+  });
+  $('#btnSave').addEventListener('click', function () {
+    var name = String(state.calc.name || '').trim();
+    var msg = $('#saveMsg');
+    if (!name) { msg.textContent = 'Bitte zuerst einen Namen eingeben.'; $('#c_name').focus(); return; }
+    var copy = Object.assign({}, state.calc, { name: name });
+    var existing = state.items.filter(function (x) { return (x.calc.name || '').trim().toLowerCase() === name.toLowerCase(); })[0];
+    if (existing) { existing.calc = copy; msg.textContent = '„' + name + '“ aktualisiert.'; }
+    else { state.items.unshift({ id: Date.now() + '-' + Math.random().toString(36).slice(2, 7), calc: copy }); msg.textContent = '„' + name + '“ gespeichert.'; }
+    state.example = false;
+    persist(); render();
+  });
+  armed($('#btnReset'), 'Wirklich zurücksetzen?', function () {
+    state.settings = Object.assign({}, DEF_SET);
+    persist(); fillInputs(); render();
+  });
+
+  /* Tabs */
+  function showTab(name) {
+    ['calc', 'saved', 'set'].forEach(function (t) {
+      $('#tab-' + t).hidden = t !== name;
+    });
+    document.querySelectorAll('nav.tabbar button').forEach(function (b) {
+      b.setAttribute('aria-selected', b.dataset.tab === name ? 'true' : 'false');
+    });
+    document.querySelector('.pricebar').style.visibility = name === 'calc' ? 'visible' : 'hidden';
+    window.scrollTo(0, 0);
+  }
+  document.querySelectorAll('nav.tabbar button').forEach(function (b) {
+    b.addEventListener('click', function () { showTab(b.dataset.tab); });
+  });
+
+  fillInputs();
+  render();
+})();
+</script>
+<script>
+if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
+  window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+}
+</script>
+</body>
+</html>

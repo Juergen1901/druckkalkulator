@@ -179,16 +179,18 @@ ul.break .bar i { display: block; height: 100%; background: var(--accent); borde
 .saved .lab { color: var(--muted); font-weight: 500; min-width: 64px; }
 .saved .m.tot { padding-top: 10px; border-top: 1px solid var(--line); color: var(--ink); }
 .saved .m.tot .lab { color: var(--ink); font-weight: 600; }
-.qty { display: flex; align-items: center; gap: 8px; }
-.qty .lab { font-size: 13px; font-weight: 500; color: var(--muted); min-width: 64px; }
+.counters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.ctr { min-width: 0; }
+.ctr .lab { display: block; font-size: 12.5px; font-weight: 500; color: var(--muted); margin-bottom: 5px; min-width: 0; }
+.qty { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .qty button {
-  width: 44px; height: 44px; padding: 0;
+  flex: none; width: 40px; height: 44px; padding: 0;
   font-size: 22px; line-height: 1;
   border-radius: 10px; border: 1px solid var(--line);
   background: var(--field); color: var(--ink);
 }
 .qty input {
-  width: 76px; min-height: 44px; padding: 8px;
+  flex: 1 1 0; width: 100%; min-width: 0; min-height: 44px; padding: 8px 4px;
   text-align: center;
   font-family: var(--font-num); font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums;
   color: var(--ink); background: var(--field);
@@ -196,11 +198,14 @@ ul.break .bar i { display: block; height: 100%; background: var(--accent); borde
   -webkit-appearance: none; appearance: none;
 }
 .qty input:focus-visible, .qty button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.sumgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px 12px; }
+.stock { font-size: 13px; color: var(--muted); }
+.stock b { font-family: var(--font-num); font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+.sumgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px 12px; }
 .sumgrid .k { font-size: 11.5px; color: var(--muted); }
 .sumgrid .v { font-family: var(--font-num); font-weight: 600; font-size: 15px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .sumgrid .v.gain { color: var(--accent); }
 .sumgrid .v.loss { color: var(--warn); }
+@media (max-width: 340px) { .counters { grid-template-columns: minmax(0, 1fr); } }
 #savedSum { margin-bottom: 12px; }
 .empty { padding: 28px 16px; text-align: center; color: var(--muted); background: var(--surface); border: 1px dashed var(--line); border-radius: 14px; }
 
@@ -287,13 +292,15 @@ nav.tabbar button[aria-selected="true"] { color: var(--accent); }
     <section id="tab-saved" class="tab" role="tabpanel" hidden>
       <div class="card-head"><h2>Gespeicherte Artikel</h2></div>
       <div class="card" id="savedSum" hidden>
-        <div class="card-head"><h2>Summe aller Artikel (mit Menge)</h2></div>
+        <div class="card-head"><h2>Summe aller Artikel</h2></div>
         <div class="sumgrid" id="sumGrid" aria-live="polite">
-          <div><div class="k">Stück gesamt</div><div class="v" id="sumQ">–</div></div>
-          <div><div class="k">Selbstkosten</div><div class="v" id="sumSelbst">–</div></div>
-          <div><div class="k">Netto</div><div class="v" id="sumNetto">–</div></div>
-          <div><div class="k">Brutto</div><div class="v" id="sumBrutto">–</div></div>
-          <div><div class="k">Gewinn</div><div class="v gain" id="sumGewinn">–</div></div>
+          <div><div class="k">Gefertigt</div><div class="v" id="sumQ">–</div></div>
+          <div><div class="k">Verkauft</div><div class="v" id="sumSold">–</div></div>
+          <div><div class="k">Auf Lager</div><div class="v" id="sumStock">–</div></div>
+          <div><div class="k">Selbstkosten gefertigt</div><div class="v" id="sumSelbst">–</div></div>
+          <div><div class="k">Netto verkauft</div><div class="v" id="sumNetto">–</div></div>
+          <div><div class="k">Brutto verkauft</div><div class="v" id="sumBrutto">–</div></div>
+          <div><div class="k">Gewinn verkauft</div><div class="v gain" id="sumGewinn">–</div></div>
         </div>
       </div>
       <ul class="saved" id="savedList"></ul>
@@ -567,24 +574,31 @@ nav.tabbar button[aria-selected="true"] { color: var(--accent); }
 
   var intFmt = new Intl.NumberFormat('de-DE');
 
-  /* Menge je Artikel (Standard 1, 0 erlaubt) */
+  /* Gefertigt (Standard 1, 0 erlaubt) und verkauft (Standard 0, höchstens gefertigt) */
   function itemQty(it) {
     if (it.qty === undefined || it.qty === null || it.qty === '') return 1;
     return Math.max(0, Math.floor(num(it.qty)));
   }
+  function soldOf(it) {
+    if (it.sold === undefined || it.sold === null || it.sold === '') return 0;
+    return Math.min(itemQty(it), Math.max(0, Math.floor(num(it.sold))));
+  }
 
   function updateSum() {
-    var t = { q: 0, selbst: 0, netto: 0, brutto: 0, gewinn: 0 };
+    var t = { q: 0, sold: 0, selbst: 0, netto: 0, brutto: 0, gewinn: 0 };
     state.items.forEach(function (it) {
-      var r = compute(it.calc, state.settings), q = itemQty(it);
+      var r = compute(it.calc, state.settings), q = itemQty(it), v = soldOf(it);
       t.q += q;
+      t.sold += v;
       t.selbst += r.selbst * q;
-      t.netto += r.netto * q;
-      t.brutto += r.brutto * q;
-      t.gewinn += r.gewinn * q;
+      t.netto += r.netto * v;
+      t.brutto += r.brutto * v;
+      t.gewinn += r.gewinn * v;
     });
     $('#savedSum').hidden = !state.items.length;
     $('#sumQ').textContent = intFmt.format(t.q);
+    $('#sumSold').textContent = intFmt.format(t.sold);
+    $('#sumStock').textContent = intFmt.format(t.q - t.sold);
     $('#sumSelbst').textContent = fmt(t.selbst);
     $('#sumNetto').textContent = fmt(t.netto);
     $('#sumBrutto').textContent = fmt(t.brutto);
@@ -593,21 +607,43 @@ nav.tabbar button[aria-selected="true"] { color: var(--accent); }
     g.className = 'v ' + (t.gewinn < 0 ? 'loss' : 'gain');
   }
 
-  function metricLine(label, vals, extraClass) {
+  function metricLine(label, names, extraClass) {
     var m = document.createElement('div');
     m.className = 'm' + (extraClass ? ' ' + extraClass : '');
     var l = document.createElement('span'); l.className = 'lab'; l.textContent = label;
     m.appendChild(l);
-    var out = [];
-    ['Selbstkosten', 'Netto', 'Brutto', 'Gewinn'].forEach(function (name, i) {
+    var bs = names.map(function (name) {
       var s = document.createElement('span');
       s.appendChild(document.createTextNode(name + ' '));
-      var b = document.createElement('b'); b.textContent = vals[i];
+      var b = document.createElement('b'); b.textContent = '';
       s.appendChild(b);
       m.appendChild(s);
-      out.push(b);
+      return b;
     });
-    return { el: m, bs: out };
+    return { el: m, bs: bs };
+  }
+
+  function makeCounter(labelText, id, ariaName, get, set) {
+    var wrap = document.createElement('div'); wrap.className = 'ctr';
+    var lab = document.createElement('label'); lab.className = 'lab'; lab.htmlFor = id; lab.textContent = labelText;
+    var box = document.createElement('div'); box.className = 'qty';
+    var minus = document.createElement('button'); minus.type = 'button'; minus.textContent = '−'; minus.setAttribute('aria-label', labelText + ' verringern');
+    var plus = document.createElement('button'); plus.type = 'button'; plus.textContent = '+'; plus.setAttribute('aria-label', labelText + ' erhöhen');
+    var inp = document.createElement('input');
+    inp.type = 'text'; inp.inputMode = 'numeric'; inp.id = id; inp.autocomplete = 'off';
+    inp.setAttribute('aria-label', labelText + ' von ' + ariaName);
+    inp.value = String(get());
+    minus.addEventListener('click', function () { set(get() - 1, false); });
+    plus.addEventListener('click', function () { set(get() + 1, false); });
+    inp.addEventListener('input', function () {
+      var d = inp.value.replace(/[^0-9]/g, '');
+      set(d === '' ? 0 : parseInt(d, 10), true, d === '');
+    });
+    inp.addEventListener('blur', function () { inp.value = String(get()); });
+    inp.addEventListener('focus', function () { try { inp.select(); } catch (e) {} });
+    box.appendChild(minus); box.appendChild(inp); box.appendChild(plus);
+    wrap.appendChild(lab); wrap.appendChild(box);
+    return { el: wrap, input: inp };
   }
 
   function renderSaved() {
@@ -626,40 +662,41 @@ nav.tabbar button[aria-selected="true"] { color: var(--accent); }
       var r = compute(it.calc, state.settings);
       var li = document.createElement('li');
       var t = document.createElement('div'); t.className = 't'; t.textContent = it.calc.name || 'Ohne Namen';
-      var one = metricLine('Je Stück', [fmt(r.selbst), fmt(r.netto), fmt(r.brutto), fmt(r.gewinn)]);
 
-      /* Mengenzeile */
-      var qrow = document.createElement('div'); qrow.className = 'qty';
-      var ql = document.createElement('span'); ql.className = 'lab'; ql.textContent = 'Menge';
-      var minus = document.createElement('button'); minus.type = 'button'; minus.textContent = '−'; minus.setAttribute('aria-label', 'Menge verringern');
-      var plus = document.createElement('button'); plus.type = 'button'; plus.textContent = '+'; plus.setAttribute('aria-label', 'Menge erhöhen');
-      var qin = document.createElement('input');
-      qin.type = 'text'; qin.inputMode = 'numeric'; qin.id = 'q_' + it.id; qin.autocomplete = 'off';
-      qin.setAttribute('aria-label', 'Menge von ' + (it.calc.name || 'Artikel'));
-      qin.value = String(itemQty(it));
-      qrow.appendChild(ql); qrow.appendChild(minus); qrow.appendChild(qin); qrow.appendChild(plus);
+      var one = metricLine('Je Stück', ['Selbstkosten', 'Netto', 'Brutto', 'Gewinn']);
+      [r.selbst, r.netto, r.brutto, r.gewinn].forEach(function (v, i) { one.bs[i].textContent = fmt(v); });
 
-      var tot = metricLine('Gesamt', ['', '', '', ''], 'tot');
+      var made = metricLine('Gefertigt', ['Selbstkosten', 'Netto', 'Brutto', 'Gewinn'], 'tot');
+      var sold = metricLine('Verkauft', ['Netto', 'Brutto', 'Gewinn'], 'tot');
+      var stock = document.createElement('div'); stock.className = 'stock';
+      stock.appendChild(document.createTextNode('Auf Lager '));
+      var stockB = document.createElement('b'); stock.appendChild(stockB);
+
+      var cq, cs;
       function refresh() {
-        var q = itemQty(it);
-        var vals = [r.selbst * q, r.netto * q, r.brutto * q, r.gewinn * q];
-        tot.bs.forEach(function (b, i) { b.textContent = fmt(vals[i]); });
+        var q = itemQty(it), v = soldOf(it);
+        [r.selbst * q, r.netto * q, r.brutto * q, r.gewinn * q].forEach(function (x, i) { made.bs[i].textContent = fmt(x); });
+        [r.netto * v, r.brutto * v, r.gewinn * v].forEach(function (x, i) { sold.bs[i].textContent = fmt(x); });
+        stockB.textContent = intFmt.format(q - v);
         updateSum();
       }
-      function setQty(n) {
+      function setQty(n, typing, empty) {
         it.qty = Math.max(0, Math.floor(n));
-        qin.value = String(it.qty);
+        if (num(it.sold) > it.qty) it.sold = it.qty;
+        if (!typing) cq.input.value = String(it.qty);
+        cs.input.value = String(soldOf(it));
         persist(); refresh();
       }
-      minus.addEventListener('click', function () { setQty(itemQty(it) - 1); });
-      plus.addEventListener('click', function () { setQty(itemQty(it) + 1); });
-      qin.addEventListener('input', function () {
-        var digits = qin.value.replace(/[^0-9]/g, '');
-        it.qty = digits === '' ? 0 : parseInt(digits, 10);
+      function setSold(n, typing, empty) {
+        it.sold = Math.min(itemQty(it), Math.max(0, Math.floor(n)));
+        if (!typing || (!empty && String(it.sold) !== cs.input.value)) cs.input.value = String(it.sold);
         persist(); refresh();
-      });
-      qin.addEventListener('blur', function () { qin.value = String(itemQty(it)); });
-      qin.addEventListener('focus', function () { try { qin.select(); } catch (e) {} });
+      }
+      var name = it.calc.name || 'Artikel';
+      cq = makeCounter('Gefertigt', 'q_' + it.id, name, function () { return itemQty(it); }, setQty);
+      cs = makeCounter('Verkauft', 's_' + it.id, name, function () { return soldOf(it); }, setSold);
+      var counters = document.createElement('div'); counters.className = 'counters';
+      counters.appendChild(cq.el); counters.appendChild(cs.el);
 
       var row = document.createElement('div'); row.className = 'row';
       var open = document.createElement('button'); open.type = 'button'; open.className = 'btn small primary'; open.textContent = 'Öffnen';
@@ -674,7 +711,8 @@ nav.tabbar button[aria-selected="true"] { color: var(--accent); }
         persist(); renderSaved();
       });
       row.appendChild(open); row.appendChild(del);
-      li.appendChild(t); li.appendChild(one.el); li.appendChild(qrow); li.appendChild(tot.el); li.appendChild(row);
+      li.appendChild(t); li.appendChild(one.el); li.appendChild(counters); li.appendChild(stock);
+      li.appendChild(made.el); li.appendChild(sold.el); li.appendChild(row);
       ul.appendChild(li);
       refresh();
     });
@@ -714,7 +752,7 @@ nav.tabbar button[aria-selected="true"] { color: var(--accent); }
     var copy = Object.assign({}, state.calc, { name: name });
     var existing = state.items.filter(function (x) { return (x.calc.name || '').trim().toLowerCase() === name.toLowerCase(); })[0];
     if (existing) { existing.calc = copy; msg.textContent = '„' + name + '“ aktualisiert.'; }
-    else { state.items.unshift({ id: Date.now() + '-' + Math.random().toString(36).slice(2, 7), calc: copy, qty: 1 }); msg.textContent = '„' + name + '“ gespeichert.'; }
+    else { state.items.unshift({ id: Date.now() + '-' + Math.random().toString(36).slice(2, 7), calc: copy, qty: 1, sold: 0 }); msg.textContent = '„' + name + '“ gespeichert.'; }
     state.example = false;
     persist(); render();
   });

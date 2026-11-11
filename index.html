@@ -176,6 +176,32 @@ ul.break .bar i { display: block; height: 100%; background: var(--accent); borde
 .saved .m { display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: 13px; color: var(--muted); }
 .saved .m b { font-family: var(--font-num); font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
 .saved .row { display: flex; gap: 8px; }
+.saved .lab { color: var(--muted); font-weight: 500; min-width: 64px; }
+.saved .m.tot { padding-top: 10px; border-top: 1px solid var(--line); color: var(--ink); }
+.saved .m.tot .lab { color: var(--ink); font-weight: 600; }
+.qty { display: flex; align-items: center; gap: 8px; }
+.qty .lab { font-size: 13px; font-weight: 500; color: var(--muted); min-width: 64px; }
+.qty button {
+  width: 44px; height: 44px; padding: 0;
+  font-size: 22px; line-height: 1;
+  border-radius: 10px; border: 1px solid var(--line);
+  background: var(--field); color: var(--ink);
+}
+.qty input {
+  width: 76px; min-height: 44px; padding: 8px;
+  text-align: center;
+  font-family: var(--font-num); font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums;
+  color: var(--ink); background: var(--field);
+  border: 1px solid var(--line); border-radius: 10px;
+  -webkit-appearance: none; appearance: none;
+}
+.qty input:focus-visible, .qty button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.sumgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px 12px; }
+.sumgrid .k { font-size: 11.5px; color: var(--muted); }
+.sumgrid .v { font-family: var(--font-num); font-weight: 600; font-size: 15px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.sumgrid .v.gain { color: var(--accent); }
+.sumgrid .v.loss { color: var(--warn); }
+#savedSum { margin-bottom: 12px; }
 .empty { padding: 28px 16px; text-align: center; color: var(--muted); background: var(--surface); border: 1px dashed var(--line); border-radius: 14px; }
 
 nav.tabbar {
@@ -260,6 +286,16 @@ nav.tabbar button[aria-selected="true"] { color: var(--accent); }
 
     <section id="tab-saved" class="tab" role="tabpanel" hidden>
       <div class="card-head"><h2>Gespeicherte Artikel</h2></div>
+      <div class="card" id="savedSum" hidden>
+        <div class="card-head"><h2>Summe aller Artikel (mit Menge)</h2></div>
+        <div class="sumgrid" id="sumGrid" aria-live="polite">
+          <div><div class="k">Stück gesamt</div><div class="v" id="sumQ">–</div></div>
+          <div><div class="k">Selbstkosten</div><div class="v" id="sumSelbst">–</div></div>
+          <div><div class="k">Netto</div><div class="v" id="sumNetto">–</div></div>
+          <div><div class="k">Brutto</div><div class="v" id="sumBrutto">–</div></div>
+          <div><div class="k">Gewinn</div><div class="v gain" id="sumGewinn">–</div></div>
+        </div>
+      </div>
       <ul class="saved" id="savedList"></ul>
     </section>
 
@@ -529,6 +565,51 @@ nav.tabbar button[aria-selected="true"] { color: var(--accent); }
     renderSaved();
   }
 
+  var intFmt = new Intl.NumberFormat('de-DE');
+
+  /* Menge je Artikel (Standard 1, 0 erlaubt) */
+  function itemQty(it) {
+    if (it.qty === undefined || it.qty === null || it.qty === '') return 1;
+    return Math.max(0, Math.floor(num(it.qty)));
+  }
+
+  function updateSum() {
+    var t = { q: 0, selbst: 0, netto: 0, brutto: 0, gewinn: 0 };
+    state.items.forEach(function (it) {
+      var r = compute(it.calc, state.settings), q = itemQty(it);
+      t.q += q;
+      t.selbst += r.selbst * q;
+      t.netto += r.netto * q;
+      t.brutto += r.brutto * q;
+      t.gewinn += r.gewinn * q;
+    });
+    $('#savedSum').hidden = !state.items.length;
+    $('#sumQ').textContent = intFmt.format(t.q);
+    $('#sumSelbst').textContent = fmt(t.selbst);
+    $('#sumNetto').textContent = fmt(t.netto);
+    $('#sumBrutto').textContent = fmt(t.brutto);
+    var g = $('#sumGewinn');
+    g.textContent = fmt(t.gewinn);
+    g.className = 'v ' + (t.gewinn < 0 ? 'loss' : 'gain');
+  }
+
+  function metricLine(label, vals, extraClass) {
+    var m = document.createElement('div');
+    m.className = 'm' + (extraClass ? ' ' + extraClass : '');
+    var l = document.createElement('span'); l.className = 'lab'; l.textContent = label;
+    m.appendChild(l);
+    var out = [];
+    ['Selbstkosten', 'Netto', 'Brutto', 'Gewinn'].forEach(function (name, i) {
+      var s = document.createElement('span');
+      s.appendChild(document.createTextNode(name + ' '));
+      var b = document.createElement('b'); b.textContent = vals[i];
+      s.appendChild(b);
+      m.appendChild(s);
+      out.push(b);
+    });
+    return { el: m, bs: out };
+  }
+
   function renderSaved() {
     var ul = $('#savedList');
     ul.innerHTML = '';
@@ -538,20 +619,48 @@ nav.tabbar button[aria-selected="true"] { color: var(--accent); }
       li.textContent = 'Noch nichts gespeichert. Im Rechner einen Artikel benennen und auf „Artikel speichern“ tippen.';
       li.style.display = 'block';
       ul.appendChild(li);
+      updateSum();
       return;
     }
     state.items.forEach(function (it) {
       var r = compute(it.calc, state.settings);
       var li = document.createElement('li');
       var t = document.createElement('div'); t.className = 't'; t.textContent = it.calc.name || 'Ohne Namen';
-      var m = document.createElement('div'); m.className = 'm';
-      [['Selbstkosten', fmt(r.selbst)], ['Netto', fmt(r.netto)], ['Brutto', fmt(r.brutto)], ['Gewinn', fmt(r.gewinn)]].forEach(function (x) {
-        var s = document.createElement('span');
-        s.appendChild(document.createTextNode(x[0] + ' '));
-        var b = document.createElement('b'); b.textContent = x[1];
-        s.appendChild(b);
-        m.appendChild(s);
+      var one = metricLine('Je Stück', [fmt(r.selbst), fmt(r.netto), fmt(r.brutto), fmt(r.gewinn)]);
+
+      /* Mengenzeile */
+      var qrow = document.createElement('div'); qrow.className = 'qty';
+      var ql = document.createElement('span'); ql.className = 'lab'; ql.textContent = 'Menge';
+      var minus = document.createElement('button'); minus.type = 'button'; minus.textContent = '−'; minus.setAttribute('aria-label', 'Menge verringern');
+      var plus = document.createElement('button'); plus.type = 'button'; plus.textContent = '+'; plus.setAttribute('aria-label', 'Menge erhöhen');
+      var qin = document.createElement('input');
+      qin.type = 'text'; qin.inputMode = 'numeric'; qin.id = 'q_' + it.id; qin.autocomplete = 'off';
+      qin.setAttribute('aria-label', 'Menge von ' + (it.calc.name || 'Artikel'));
+      qin.value = String(itemQty(it));
+      qrow.appendChild(ql); qrow.appendChild(minus); qrow.appendChild(qin); qrow.appendChild(plus);
+
+      var tot = metricLine('Gesamt', ['', '', '', ''], 'tot');
+      function refresh() {
+        var q = itemQty(it);
+        var vals = [r.selbst * q, r.netto * q, r.brutto * q, r.gewinn * q];
+        tot.bs.forEach(function (b, i) { b.textContent = fmt(vals[i]); });
+        updateSum();
+      }
+      function setQty(n) {
+        it.qty = Math.max(0, Math.floor(n));
+        qin.value = String(it.qty);
+        persist(); refresh();
+      }
+      minus.addEventListener('click', function () { setQty(itemQty(it) - 1); });
+      plus.addEventListener('click', function () { setQty(itemQty(it) + 1); });
+      qin.addEventListener('input', function () {
+        var digits = qin.value.replace(/[^0-9]/g, '');
+        it.qty = digits === '' ? 0 : parseInt(digits, 10);
+        persist(); refresh();
       });
+      qin.addEventListener('blur', function () { qin.value = String(itemQty(it)); });
+      qin.addEventListener('focus', function () { try { qin.select(); } catch (e) {} });
+
       var row = document.createElement('div'); row.className = 'row';
       var open = document.createElement('button'); open.type = 'button'; open.className = 'btn small primary'; open.textContent = 'Öffnen';
       open.addEventListener('click', function () {
@@ -565,8 +674,9 @@ nav.tabbar button[aria-selected="true"] { color: var(--accent); }
         persist(); renderSaved();
       });
       row.appendChild(open); row.appendChild(del);
-      li.appendChild(t); li.appendChild(m); li.appendChild(row);
+      li.appendChild(t); li.appendChild(one.el); li.appendChild(qrow); li.appendChild(tot.el); li.appendChild(row);
       ul.appendChild(li);
+      refresh();
     });
   }
 
@@ -604,7 +714,7 @@ nav.tabbar button[aria-selected="true"] { color: var(--accent); }
     var copy = Object.assign({}, state.calc, { name: name });
     var existing = state.items.filter(function (x) { return (x.calc.name || '').trim().toLowerCase() === name.toLowerCase(); })[0];
     if (existing) { existing.calc = copy; msg.textContent = '„' + name + '“ aktualisiert.'; }
-    else { state.items.unshift({ id: Date.now() + '-' + Math.random().toString(36).slice(2, 7), calc: copy }); msg.textContent = '„' + name + '“ gespeichert.'; }
+    else { state.items.unshift({ id: Date.now() + '-' + Math.random().toString(36).slice(2, 7), calc: copy, qty: 1 }); msg.textContent = '„' + name + '“ gespeichert.'; }
     state.example = false;
     persist(); render();
   });
